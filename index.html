@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d2a4a">
+<title>КУТ — родблок</title>
+<meta name="description" content="Оценка клинически узкого таза в родах по алгоритму КР (Прил. Б1) с выдачей PDF-листа">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="КУТ">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+:root{
+  --ink:#000814; --ink2:#1a2430; --navy:#0d2a4a; --line:#6b7786;
+  --bg:#e6eaef; --card:#ffffff; --red:#b3001e; --green:#0a6231; --amber:#7a3f00;
+  --serif:"PT Serif",Georgia,"Times New Roman",serif;
+  --sans:"PT Sans","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.4}
+header.top{position:sticky;top:0;z-index:10;background:var(--navy);color:#fff;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top));display:flex;gap:12px;align-items:center;justify-content:space-between}
+header.top .brand{font-family:var(--serif);font-weight:700;font-size:18px}
+.status{font-weight:700;font-size:14px;padding:6px 10px;border-radius:6px;background:#fff;color:var(--ink);text-align:right}
+.status.high{background:var(--red);color:#fff}
+.status.low{background:var(--green);color:#fff}
+.status.em{background:#fff200;color:#000}
+main{max-width:860px;margin:0 auto;padding:14px 12px 110px}
+.card{background:var(--card);border:1.5px solid #b7c0cc;border-radius:10px;padding:14px 14px 16px;margin-bottom:14px}
+.card h2{font-family:var(--serif);font-size:19px;margin:0 0 10px;color:var(--navy)}
+.card h3{font-size:15px;margin:14px 0 6px;color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:700;color:var(--ink)}
+label.f .hint{font-weight:400;font-size:13px;color:var(--ink2)}
+input[type=text],input[type=date],input[type=time],select,textarea{
+  font:inherit;font-size:16px;color:var(--ink);background:#fff;border:1.5px solid var(--line);border-radius:7px;padding:9px 10px;width:100%}
+textarea{min-height:60px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:3px solid #1f6fd1;outline-offset:1px}
+.flag{font-size:13px;font-weight:700;min-height:18px}
+.flag.bad{color:var(--red)} .flag.ok{color:var(--green)}
+.seg{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{border:1.5px solid var(--line);border-radius:7px;padding:8px 16px;font-weight:700;cursor:pointer;background:#fff}
+.seg input:checked+label{background:var(--navy);border-color:var(--navy);color:#fff}
+.seg input:focus-visible+label{outline:3px solid #1f6fd1}
+.seg input:disabled+label{opacity:.55;cursor:not-allowed}
+.row{margin-bottom:12px}
+.rowlabel{font-weight:700;font-size:15px}
+.note{font-size:13.5px;color:var(--ink2);margin:6px 0 0}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #d3d9e0;font-size:15px}
+.chk:last-child{border-bottom:0}
+.chk input{width:22px;height:22px;flex:0 0 22px;margin-top:1px;accent-color:var(--navy)}
+.muted-card{opacity:.6}
+details.fold summary{cursor:pointer;font-weight:700;font-size:15px;color:var(--navy);padding:6px 0}
+.btn{font:inherit;font-weight:700;font-size:16px;border-radius:8px;padding:12px 14px;border:2px solid var(--navy);background:var(--navy);color:#fff;cursor:pointer;width:100%;margin-top:12px}
+.log{margin-top:14px}
+.logi{border:1.5px solid #b7c0cc;border-left:6px solid var(--green);border-radius:8px;padding:9px 11px;margin-bottom:8px;display:flex;gap:10px;justify-content:space-between;align-items:flex-start;font-size:14.5px}
+.logi.bad{border-left-color:var(--red)}
+.logi.warn{border-left-color:var(--amber)}
+.logi b.t{font-size:16px}
+.logi .del{font:inherit;font-weight:700;background:#fff;border:1.5px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--ink)}
+.vres{font-weight:700}
+.vres.bad{color:var(--red)} .vres.ok{color:var(--green)} .vres.warn{color:var(--amber)}
+#pv{overflow:hidden;border:1.5px solid #b7c0cc;border-radius:6px;background:#fff}
+#scaler{width:794px;transform-origin:0 0}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:#fff;border-top:2px solid var(--navy);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center}
+.bar button{font:inherit;font-weight:700;font-size:15px;border-radius:8px;padding:12px 10px;border:2px solid var(--navy);background:var(--navy);color:#fff;cursor:pointer;flex:1;max-width:220px}
+.bar button.sec{background:#fff;color:var(--navy)}
+.bar button:disabled{opacity:.6}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:30;display:none;align-items:flex-end;justify-content:center;padding:12px}
+.modal.open{display:flex}
+.modal .m{background:#fff;color:#000;border-radius:12px;padding:16px;width:100%;max-width:420px;margin-bottom:env(safe-area-inset-bottom)}
+.modal h3{font-family:var(--serif);margin:0 0 4px;font-size:19px;color:var(--navy)}
+.modal .fn{font-size:13.5px;color:var(--ink2);word-break:break-all;margin-bottom:8px}
+.modal .btn{margin-top:8px}
+.modal .btn.sec{background:#fff;color:var(--navy)}
+.ver{text-align:center;font-size:13px;color:var(--ink2);margin-top:4px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#000;color:#fff;padding:10px 16px;border-radius:8px;font-weight:700;display:none;z-index:20}
+
+/* ===== ЛИСТ A4 ===== */
+.sheet{width:794px;min-height:1120px;padding:32px 38px 24px;background:#fff;color:#000;font-family:var(--sans);font-size:12.5px;line-height:1.35;display:flex;flex-direction:column;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sh-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #0d2a4a;padding-bottom:8px}
+.sh-head .inst{font-size:12px;font-weight:700;color:#0d2a4a}
+.sh-head h1{font-family:var(--serif);font-size:23px;margin:3px 0 2px;color:#000;line-height:1.15}
+.sh-head .sub{font-size:11.5px;color:#1a2430}
+.sh-head .dt{text-align:right;font-size:12px;white-space:nowrap}
+.pt{display:grid;grid-template-columns:2.2fr .7fr 1fr .8fr 1fr .9fr;margin-top:10px;border:1.2px solid #0d2a4a}
+.pt div{padding:5px 7px;border-right:1px solid #9aa4b1}
+.pt div:last-child{border-right:0}
+.pt small{display:block;font-size:10px;color:#1a2430}
+.pt b{font-size:12.5px}
+.banner{margin-top:10px;padding:9px 12px;font-weight:700;font-size:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-radius:4px}
+.banner span{font-size:12px}
+.banner.high{background:#b3001e;color:#fff}
+.banner.low{background:#0a6231;color:#fff}
+.banner.none{background:#fff;color:#000;border:1.5px dashed #000}
+.banner.em{background:#fff200;color:#000;border:2px solid #000;margin-top:6px}
+.cols{display:flex;gap:16px;margin-top:10px}
+.cols .l{flex:1;min-width:0}
+.cols .r{width:252px;flex:0 0 252px}
+table.t{width:100%;border-collapse:collapse;font-size:11.6px}
+table.t th{background:#0d2a4a;color:#fff;text-align:left;padding:4px 6px;font-size:11px}
+table.t td{border-bottom:1px solid #b4bcc7;padding:3.5px 6px;vertical-align:top}
+table.t tr.grp td{background:#e8edf3;font-weight:700;border-bottom:1px solid #0d2a4a}
+table.t td.sub{padding-left:16px}
+table.t tr{page-break-inside:avoid}
+.res{font-weight:700;white-space:nowrap}
+.res.bad{color:#b3001e}.res.ok{color:#0a6231}.res.na{color:#1a2430;font-weight:400}.res.warn{color:#7a3f00}
+.sec-t{font-family:var(--serif);font-weight:700;font-size:14px;color:#0d2a4a;margin:10px 0 4px}
+ul.rec{margin:0;padding-left:18px}
+ul.rec li{margin:2px 0}
+.fc-cap{font-size:10.5px;color:#1a2430;text-align:center;margin-top:2px}
+.box{border:1.2px solid #0d2a4a;border-radius:4px;padding:7px 9px;margin-top:10px;page-break-inside:avoid}
+.concl{background:#f1f4f8;border-left:4px solid #0d2a4a;padding:7px 10px;margin-top:10px;font-size:12.3px;page-break-inside:avoid}
+.sign{display:flex;justify-content:space-between;gap:20px;margin-top:16px;font-size:12.5px}
+.sign .ln{display:inline-block;border-bottom:1px solid #000;min-width:170px;height:14px;vertical-align:bottom}
+.foot{margin-top:auto;padding-top:10px;border-top:1px solid #6b7786;font-size:10px;color:#1a2430}
+
+@media print{
+  @page{size:A4;margin:0}
+  html,body{background:#fff}
+  body *{visibility:hidden}
+  #sheet,#sheet *{visibility:visible}
+  #sheet{position:absolute;left:0;top:0}
+  #scaler{transform:none!important}
+  #pv{overflow:visible;border:0;height:auto!important}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">КУТ · родблок</div>
+  <div id="status" class="status">Введите данные</div>
+</header>
+
+<main>
+<section class="card">
+  <h2>Роженица</h2>
+  <div class="grid">
+    <label class="f" style="grid-column:1/-1">ФИО<input type="text" id="fio" autocomplete="off"></label>
+    <label class="f">Возраст, лет<input type="text" id="age" inputmode="numeric"></label>
+    <label class="f">№ истории родов<input type="text" id="card"></label>
+    <label class="f">Срок, нед<input type="text" id="ga" placeholder="39+2"></label>
+    <label class="f">Роды
+      <select id="parity"><option value="">—</option><option value="first">Первые</option><option value="rep">Повторные</option></select>
+    </label>
+    <label class="f">Дата<input type="date" id="date"></label>
+    <label class="f">Поступление, время<input type="time" id="adm"></label>
+    <label class="f">Врач<input type="text" id="doctor" value="Осокин И.П."></label>
+    <label class="f" style="grid-column:1/-1">Учреждение<input type="text" id="inst" value="ГКБ № 67 им. Л.А. Ворохобова"></label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Факторы риска при поступлении</h2>
+  <div class="row">
+    <div class="rowlabel">Затрудненные роды, родовая травма в анамнезе</div>
+    <div class="seg">
+      <input type="radio" name="hist" id="h_no" value="no"><label for="h_no">Нет</label>
+      <input type="radio" name="hist" id="h_yes" value="yes"><label for="h_yes">Да</label>
+    </div>
+    <p class="note" id="histNote" hidden>Первые роды — критерий не применяется.</p>
+  </div>
+  <div class="grid">
+    <label class="f">Рост, см<input type="text" id="height" inputmode="decimal"><span class="hint">фактор: &lt; 155</span><span class="flag" id="f_height"></span></label>
+    <label class="f">Размер обуви<input type="text" id="shoe" inputmode="decimal"><span class="hint">&lt; 36 (RU) или &lt; 23 см</span><span class="flag" id="f_shoe"></span></label>
+    <label class="f">ПМП, г<input type="text" id="efw" inputmode="numeric"><span class="hint">фактор: ≥ 4000</span><span class="flag" id="f_efw"></span></label>
+    <label class="f">ВДМ, см<input type="text" id="fundal" inputmode="decimal"><span class="hint">для рост/ВДМ</span><span class="flag" id="f_ratio"></span></label>
+  </div>
+  <h3>Наружная пельвиметрия, см</h3>
+  <div class="grid" id="pelGrid"></div>
+  <h3>Ромб Михаэлиса, см</h3>
+  <div class="grid">
+    <label class="f">Продольный<input type="text" id="mL" inputmode="decimal"><span class="hint">фактор: &lt; 10,6</span><span class="flag" id="f_mL"></span></label>
+    <label class="f">Поперечный<input type="text" id="mT" inputmode="decimal"><span class="hint">фактор: &lt; 9,6</span><span class="flag" id="f_mT"></span></label>
+  </div>
+</section>
+
+<section class="card" id="tacCard">
+  <h2>Тактика при высоком риске</h2>
+  <label class="f">Консультативное решение
+    <select id="tactic">
+      <option value="">Не определено</option>
+      <option value="labor">Роды с функциональной оценкой таза</option>
+      <option value="cs">Кесарево сечение</option>
+    </select>
+  </label>
+  <label class="f" style="margin-top:10px">Состав консилиума / кто принял решение<input type="text" id="consil"></label>
+  <p class="note" id="tacNote"></p>
+</section>
+
+<section class="card">
+  <h2>Функциональная оценка таза в родах</h2>
+  <div class="grid">
+    <label class="f">Время<input type="time" id="a_time"></label>
+    <label class="f">Период
+      <select id="a_period"><option value="I">I период</option><option value="II">II период</option></select>
+    </label>
+    <label class="f">Открытие, см<input type="text" id="a_dil" inputmode="decimal"></label>
+    <label class="f">Признак Вастена
+      <select id="a_vasten">
+        <option value="">Не оценивался</option>
+        <option value="neg">Отрицательный</option>
+        <option value="eq">Вровень</option>
+        <option value="pos">Положительный</option>
+      </select>
+    </label>
+    <label class="f" style="grid-column:1/-1">Головка плода
+      <select id="a_head"></select>
+    </label>
+  </div>
+  <div class="rowlabel" style="margin-top:12px">Признаки несоответствия *</div>
+  <div id="signs"></div>
+  <label class="f" style="margin-top:8px">Примечание<input type="text" id="a_note"></label>
+  <button class="btn" id="addA">Добавить оценку</button>
+  <p class="note">* Список сверить со сноской к алгоритму Б1.</p>
+  <div class="log" id="logList"></div>
+</section>
+
+<section class="card">
+  <h2>Комментарий</h2>
+  <textarea id="comment" placeholder="Попадёт в лист"></textarea>
+</section>
+
+<section class="card">
+  <h2>Лист для печати</h2>
+  <div id="pv"><div id="scaler"><div id="sheet" class="sheet"></div></div></div>
+</section>
+<div class="ver">КУТ · родблок · v1.0 · данные не сохраняются и никуда не передаются</div>
+</main>
+
+<div class="bar">
+  <button id="btnPdf">Скачать PDF</button>
+  <button id="btnCopy" class="sec">Заключение</button>
+  <button id="btnPrint" class="sec">Печать</button>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal" id="pdfModal" role="dialog" aria-modal="true" aria-labelledby="pdfTitle">
+  <div class="m">
+    <h3 id="pdfTitle">PDF готов</h3>
+    <div class="fn" id="pdfName"></div>
+    <button class="btn" id="pdfShare">Отправить / сохранить в Файлы</button>
+    <button class="btn sec" id="pdfDl">Скачать</button>
+    <button class="btn sec" id="pdfClose">Закрыть</button>
+  </div>
+</div>
+
+<script>
+/* ==== НАСТРОЙКИ ==== */
+const PELVIS=[
+  {id:'dsp', name:'D. spinarum',      short:'D.sp',  norm:'25–26',   thr:23.5},
+  {id:'dcr', name:'D. cristarum',     short:'D.cr',  norm:'28–29',   thr:26.5},
+  {id:'dtr', name:'D. trochanterica', short:'D.tr',  norm:'30–31',   thr:28.5},
+  {id:'cext',name:'C. externa',       short:'C.ext', norm:'20–21',   thr:18.5},
+  {id:'cdiag',name:'C. diagonalis',   short:'C.diag',norm:'12,5–13', thr:11.0},
+];
+const HEAD=[
+  ['','—'],
+  ['above','Над входом в малый таз (подвижна)'],
+  ['pressed','Прижата ко входу в малый таз'],
+  ['small','Малым сегментом во входе'],
+  ['large','Большим сегментом во входе'],
+  ['wide','В широкой части полости малого таза'],
+  ['narrow','В узкой части полости малого таза'],
+  ['floor','На тазовом дне'],
+];
+const SIGNS=[
+  'Схватки потужного характера при головке плода над входом / прижатой ко входу в малый таз',
+  'Отсутствие продвижения головки при полном открытии и адекватной родовой деятельности',
+  'Положительный признак Цангемейстера',
+  'Отёк шейки матки и/или наружных половых органов',
+  'Затруднение мочеиспускания, примесь крови в моче',
+  'Выраженная конфигурация головки, большая родовая опухоль',
+  'Нарушение биомеханизма родов (асинклитизм, разгибательное вставление, высокое прямое стояние стреловидного шва)',
+  'Признаки угрожающего разрыва матки (высокое стояние контракционного кольца, болезненность нижнего сегмента)',
+];
+const VASTEN={'':'не оценивался',neg:'отрицательный',eq:'вровень',pos:'положительный'};
+const RATIO_THR=4.7;
+
+/* ==== утилиты ==== */
+const $=id=>document.getElementById(id);
+const num=id=>{const v=($(id).value||'').replace(',','.').trim();if(v==='')return null;const n=parseFloat(v);return isFinite(n)?n:null;};
+const fmt=(n,d)=>n==null?'—':(d!=null?n.toFixed(d):String(n)).replace('.',',');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dateRu=v=>v?v.split('-').reverse().join('.'):'';
+const nowHM=()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');};
+const headTxt=v=>(HEAD.find(h=>h[0]===v)||['',''])[1];
+function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',2200);}
+
+/* ==== форма ==== */
+$('pelGrid').innerHTML=PELVIS.map(p=>`<label class="f">${p.name}<input type="text" id="${p.id}" inputmode="decimal"><span class="hint">норма ${p.norm} · фактор ≤ ${fmt(p.thr)}</span><span class="flag" id="f_${p.id}"></span></label>`).join('');
+$('signs').innerHTML=SIGNS.map((s,i)=>`<label class="chk"><input type="checkbox" id="s${i}"><span>${s}</span></label>`).join('');
+$('a_head').innerHTML=HEAD.map(h=>`<option value="${h[0]}">${h[1]}</option>`).join('');
+{const d=new Date();$('date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;$('adm').value=nowHM();$('a_time').value=nowHM();}
+
+/* ==== журнал оценок (только в памяти страницы) ==== */
+const LOG=[];
+const aBad=a=>a.signs.length>0||a.vasten==='pos';
+const aWarn=a=>!aBad(a)&&a.vasten==='eq';
+$('addA').onclick=()=>{
+  const a={time:$('a_time').value||nowHM(),period:$('a_period').value,dil:num('a_dil'),head:$('a_head').value,
+    vasten:$('a_vasten').value,signs:SIGNS.map((s,i)=>$('s'+i).checked?i:-1).filter(i=>i>=0),note:$('a_note').value.trim()};
+  LOG.push(a);LOG.sort((x,y)=>x.time.localeCompare(y.time));
+  SIGNS.forEach((s,i)=>$('s'+i).checked=false);$('a_note').value='';$('a_vasten').value='';$('a_time').value=nowHM();
+  toast(aBad(a)?'Оценка добавлена: есть признаки несоответствия':'Оценка добавлена');render();
+};
+$('logList').onclick=e=>{const b=e.target.closest('.del');if(!b)return;if(confirm('Удалить оценку '+LOG[+b.dataset.i].time+'?')){LOG.splice(+b.dataset.i,1);render();}};
+
+/* ==== расчёт ==== */
+function evaluate(){
+  const parity=$('parity').value;
+  let hist=(document.querySelector('input[name=hist]:checked')||{}).value||'';
+  if(parity==='first')hist='no';
+  const h=num('height'),shoe=num('shoe'),efw=num('efw'),fh=num('fundal'),mL=num('mL'),mT=num('mT');
+  const pel=PELVIS.map(p=>{const v=num(p.id);return{...p,v,flag:v==null?null:v<=p.thr};});
+  let shoeFlag=null,shoeVal='—';
+  if(shoe!=null){if(shoe<30){shoeFlag=shoe<23;shoeVal=fmt(shoe)+' см';}else{shoeFlag=shoe<36;shoeVal=fmt(shoe)+' (RU)';}}
+  const pelIn=pel.filter(p=>p.v!=null),mIn=mL!=null||mT!=null;
+  const crit=[
+    {key:'hist',name:'Затрудненные роды, родовая травма в анамнезе',val:hist===''?'—':hist==='yes'?'Да':(parity==='first'?'Нет (первые роды)':'Нет'),thr:'да',flag:hist===''?null:hist==='yes'},
+    {key:'h',name:'Рост',val:h==null?'—':fmt(h)+' см',thr:'< 155 см',flag:h==null?null:h<155},
+    {key:'shoe',name:'Размер обуви',val:shoeVal,thr:'< 36 / < 23 см',flag:shoeFlag},
+    {key:'pel',name:'Размеры таза уменьшены на ≥ 1,5 см',flag:pelIn.length?pelIn.some(p=>p.flag):null},
+    {key:'m',name:'Ромб Михаэлиса',flag:mIn?((mL!=null&&mL<10.6)||(mT!=null&&mT<9.6)):null},
+    {key:'efw',name:'ПМП',val:efw==null?'—':efw+' г',thr:'≥ 4000 г',flag:efw==null?null:efw>=4000},
+  ];
+  const assessed=crit.filter(c=>c.flag!==null).length,pos=crit.filter(c=>c.flag===true),missing=crit.filter(c=>c.flag===null);
+  const ratio=(h!=null&&fh)?h/fh:null;
+  const risk=pos.length?'high':assessed===0?'none':'low';
+  const last=LOG.length?LOG[LOG.length-1]:null;
+  const anyBad=LOG.some(aBad);
+  return{parity,h,shoe,shoeFlag,efw,fh,mL,mT,pel,crit,assessed,pos,missing,ratio,risk,last,anyBad,tactic:$('tactic').value};
+}
+
+/* ==== блок-схема (родблок) ==== */
+function flow(a){
+  const on=id=>a.has(id),ON='#0d2a4a',OFF='#8b95a3';let s='';
+  const txt=(cx,cy,l,o)=>{const lh=12,y0=cy-(l.length-1)*lh/2+4;l.forEach((t,i)=>{s+=`<text x="${cx}" y="${y0+i*lh}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="10.5" font-weight="${o?700:400}" fill="${o?'#ffffff':'#1a2430'}">${t}</text>`;});};
+  const box=(id,x,y,w,h,l)=>{const o=on(id);s+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${o?ON:'#ffffff'}" stroke="${o?ON:OFF}" stroke-width="${o?2:1.2}"/>`;txt(x+w/2,y+h/2,l,o);};
+  const dia=(id,cx,cy,w,h,l)=>{const o=on(id);s+=`<polygon points="${cx},${cy-h/2} ${cx+w/2},${cy} ${cx},${cy+h/2} ${cx-w/2},${cy}" fill="${o?ON:'#ffffff'}" stroke="${o?ON:OFF}" stroke-width="${o?2:1.2}"/>`;txt(cx,cy,l,o);};
+  const ln=(id,p)=>{const o=on(id),c=o?ON:OFF;s+=`<polyline points="${p.map(q=>q.join(',')).join(' ')}" fill="none" stroke="${c}" stroke-width="${o?2.4:1.2}"/>`;
+    const[x1,y1]=p[p.length-2],[x2,y2]=p[p.length-1],g=Math.atan2(y2-y1,x2-x1),L=7,W=4;
+    s+=`<polygon points="${x2},${y2} ${[x2-L*Math.cos(g)+W*Math.sin(g),y2-L*Math.sin(g)-W*Math.cos(g)]} ${[x2-L*Math.cos(g)-W*Math.sin(g),y2-L*Math.sin(g)+W*Math.cos(g)]}" fill="${c}"/>`;};
+  const lb=(x,y,t,id)=>{s+=`<text x="${x}" y="${y}" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="700" fill="${on(id)?ON:'#3a4452'}">${t}</text>`;};
+  ln('e0',[[150,40],[150,54]]);
+  ln('eYes',[[79,101],[79,140]]);lb(58,126,'Да','eYes');
+  ln('eNo',[[238,96],[238,140]]);lb(245,126,'Нет','eNo');
+  ln('eCS',[[40,180],[40,215]]);
+  ln('eTL',[[125,180],[125,197],[190,197],[190,215]]);
+  ln('eLow',[[250,180],[250,215]]);
+  ln('eLD',[[218,255],[218,275]]);
+  ln('eEm',[[218,335],[218,365]]);lb(225,355,'Да','eEm');
+  ln('eNs',[[143,305],[64,305],[64,365]]);lb(88,299,'Нет','eNs');
+  box('n0',40,4,220,36,['Поступление в родблок:','обследование, пельвиметрия']);
+  dia('d1',150,88,230,68,['Факторы риска','КУТ?']);
+  box('tac',4,140,150,40,['Консультативное','определение тактики']);
+  box('low',180,140,116,40,['Группа','низкого риска']);
+  box('cs',4,215,110,40,['Кесарево','сечение']);
+  box('lab',140,215,156,40,['Роды с функциональной','оценкой таза']);
+  dia('d2',218,305,150,60,['Признаки','несоответствия? *']);
+  box('em',155,365,126,36,['Экстренное','кесарево сечение']);
+  box('ns',4,365,126,36,['Продолжение родов,','повторная оценка']);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 405" width="252" height="340">${s}</svg>`;
+}
+function route(r){
+  const a=new Set(['n0']);
+  if(r.risk!=='none'){a.add('e0');a.add('d1');}
+  if(r.risk==='high'){a.add('eYes');a.add('tac');
+    if(r.tactic==='cs'){a.add('eCS');a.add('cs');}
+    if(r.tactic==='labor'){a.add('eTL');a.add('lab');}}
+  if(r.risk==='low'){['eNo','low','eLow','lab'].forEach(x=>a.add(x));}
+  if(r.last){if(a.has('lab'))a.add('eLD');a.add('d2');
+    if(aBad(r.last)){a.add('eEm');a.add('em');}else{a.add('eNs');a.add('ns');}}
+  return a;
+}
+
+/* ==== заключение ==== */
+function aSummary(a){
+  const p=[];p.push(a.period+' период');if(a.dil!=null)p.push('открытие '+fmt(a.dil)+' см');
+  if(a.head)p.push('головка: '+headTxt(a.head).toLowerCase());p.push('признак Вастена '+VASTEN[a.vasten]);
+  return p.join(', ');
+}
+function conclusion(r){
+  const ga=$('ga').value.trim();let t='';
+  if(r.risk==='high'){
+    const f=r.pos.map(c=>({
+      hist:'затрудненные роды/родовая травма в анамнезе',h:`рост ${fmt(r.h)} см`,
+      shoe:`размер обуви ${r.shoe<30?fmt(r.shoe)+' см':fmt(r.shoe)}`,efw:`ПМП ${r.efw} г`,
+      pel:'уменьшение размеров таза ('+r.pel.filter(p=>p.flag).map(p=>`${p.short} ${fmt(p.v)} см`).join(', ')+')',
+      m:`ромб Михаэлиса ${fmt(r.mL)}×${fmt(r.mT)} см`}[c.key])).join('; ');
+    t=`Учитывая ${ga?'срок беременности '+ga+' нед., ':''}наличие факторов риска клинически узкого таза (${f}), согласно КР «Клинически узкий таз» (Приложение Б1) роженица относится к группе высокого риска КУТ.`;
+    if(r.tactic==='labor')t+=' Консультативно определена тактика: роды через естественные родовые пути с функциональной оценкой таза.';
+    else if(r.tactic==='cs')t+=' Консультативно определена тактика: родоразрешение путём кесарева сечения.';
+    else t+=' Показано консультативное определение тактики родоразрешения.';
+  }else if(r.risk==='low'){
+    t=`Учитывая ${ga?'срок беременности '+ga+' нед., ':''}отсутствие факторов риска клинически узкого таза${r.missing.length?' по оценённым критериям ('+r.assessed+' из 6)':''}, согласно КР «Клинически узкий таз» (Приложение Б1) роженица относится к группе низкого риска КУТ. Роды ведутся с функциональной оценкой таза.`;
+  }
+  if(r.last){const a=r.last,bad=aBad(a);
+    const sg=[...(a.vasten==='pos'?['положительный признак Вастена']:[]),...a.signs.map(i=>SIGNS[i].toLowerCase())];
+    t+=(t?' ':'')+`При функциональной оценке таза в ${a.time} (${aSummary(a)}) `+
+      (bad?`выявлены признаки несоответствия: ${sg.join('; ')}. Показано экстренное кесарево сечение.`
+          :`признаков несоответствия размеров таза и головки плода не выявлено${a.vasten==='eq'?' (признак Вастена вровень — динамическое наблюдение)':''}. Продолжение родов с повторной оценкой.`);
+  }
+  return t;
+}
+
+/* ==== рендер ==== */
+function setFlag(id,flag){const e=$(id);if(!e)return;e.className='flag'+(flag===true?' bad':flag===false?' ok':'');e.textContent=flag===true?'⚠ фактор риска':flag===false?'✓ норма':'';}
+function resCell(f){return f===true?'<span class="res bad">ФАКТОР</span>':f===false?'<span class="res ok">норма</span>':'<span class="res na">не оценено</span>';}
+
+function render(){
+  const r=evaluate();
+  const first=r.parity==='first';
+  document.querySelectorAll('input[name=hist]').forEach(x=>x.disabled=first);
+  $('histNote').hidden=!first;
+  setFlag('f_height',r.crit[1].flag);setFlag('f_shoe',r.shoeFlag);setFlag('f_efw',r.crit[5].flag);
+  r.pel.forEach(p=>setFlag('f_'+p.id,p.flag));
+  setFlag('f_mL',r.mL==null?null:r.mL<10.6);setFlag('f_mT',r.mT==null?null:r.mT<9.6);
+  const rf=$('f_ratio');
+  if(r.ratio!=null){const b=r.ratio<RATIO_THR;rf.className='flag '+(b?'bad':'ok');rf.textContent=`рост/ВДМ = ${fmt(r.ratio,2)}`;}else{rf.className='flag';rf.textContent='';}
+  $('tacCard').classList.toggle('muted-card',r.risk!=='high');
+  $('tacNote').textContent=r.risk==='high'?'':'Заполняется при наличии факторов риска.';
+
+  // журнал в форме (новые сверху)
+  $('logList').innerHTML=LOG.map((a,i)=>({a,i})).reverse().map(({a,i})=>{
+    const bad=aBad(a),warn=aWarn(a);
+    const sg=[...(a.vasten==='pos'?['Вастен +']:[]),...a.signs.map(k=>SIGNS[k])];
+    return `<div class="logi ${bad?'bad':warn?'warn':''}"><div><b class="t">${esc(a.time)}</b> · ${esc(aSummary(a))}<br>
+      <span class="vres ${bad?'bad':warn?'warn':'ok'}">${bad?'Несоответствие: '+esc(sg.join('; ')):warn?'Вастен вровень — наблюдение':'Признаков несоответствия нет'}</span>
+      ${a.note?`<br>${esc(a.note)}`:''}</div><button class="del" data-i="${i}" aria-label="Удалить">✕</button></div>`;}).join('');
+
+  const st=$('status');
+  if(r.last&&aBad(r.last)){st.className='status em';st.textContent='Несоответствие → экстренное КС';}
+  else if(r.risk==='high'){st.className='status high';st.textContent=`Высокий риск · факторов: ${r.pos.length}`;}
+  else if(r.risk==='low'){st.className='status low';st.textContent=r.missing.length?`Низкий риск · ${r.assessed}/6`:'Низкий риск · 6/6';}
+  else{st.className='status';st.textContent='Введите данные';}
+
+  let banner;
+  if(r.risk==='high')banner=`<div class="banner high">Группа высокого риска КУТ<span>факторов: ${r.pos.length} из ${r.assessed} оценённых</span></div>`;
+  else if(r.risk==='low')banner=`<div class="banner low">Группа низкого риска КУТ<span>${r.missing.length?'оценено '+r.assessed+' из 6 критериев':'оценены все 6 критериев'}</span></div>`;
+  else banner=`<div class="banner none">Факторы риска не оценены</div>`;
+  if(r.last&&aBad(r.last))banner+=`<div class="banner em">Признаки несоответствия (${esc(r.last.time)}) — показано экстренное кесарево сечение</div>`;
+
+  const c=r.crit;
+  let rows=`<tr><th>Критерий</th><th>Значение</th><th>Порог / норма</th><th>Итог</th></tr>`;
+  [0,1,2,5].forEach(k=>{rows+=`<tr><td>${c[k].name}</td><td>${c[k].val}</td><td>${c[k].thr}</td><td>${resCell(c[k].flag)}</td></tr>`;});
+  rows+=`<tr class="grp"><td colspan="3">Наружная пельвиметрия (уменьшение ≥ 1,5 см)</td><td>${resCell(c[3].flag)}</td></tr>`;
+  r.pel.forEach(p=>{rows+=`<tr><td class="sub">${p.name}</td><td>${p.v==null?'—':fmt(p.v)+' см'}</td><td>${p.norm} (≤ ${fmt(p.thr)})</td><td>${p.v==null?'':resCell(p.flag)}</td></tr>`;});
+  rows+=`<tr class="grp"><td colspan="3">Ромб Михаэлиса</td><td>${resCell(c[4].flag)}</td></tr>`;
+  rows+=`<tr><td class="sub">Продольный</td><td>${r.mL==null?'—':fmt(r.mL)+' см'}</td><td>&lt; 10,6 см</td><td>${r.mL==null?'':resCell(r.mL<10.6)}</td></tr>`;
+  rows+=`<tr><td class="sub">Поперечный</td><td>${r.mT==null?'—':fmt(r.mT)+' см'}</td><td>&lt; 9,6 см</td><td>${r.mT==null?'':resCell(r.mT<9.6)}</td></tr>`;
+  rows+=`<tr class="grp"><td colspan="4">Доп. маркер (текст КР, в алгоритм Б1 не входит)</td></tr>`;
+  rows+=`<tr><td class="sub">Рост / ВДМ</td><td>${r.ratio==null?'—':fmt(r.ratio,2)}</td><td>&lt; 4,7</td><td>${r.ratio==null?'':(r.ratio<RATIO_THR?'<span class="res bad">снижено</span>':'<span class="res ok">норма</span>')}</td></tr>`;
+
+  let tac='';
+  if(r.risk==='high'){const cs=$('consil').value.trim();
+    tac=`<div class="sec-t">Тактика</div><ul class="rec"><li>Консультативное решение: <b>${r.tactic==='cs'?'кесарево сечение':r.tactic==='labor'?'роды с функциональной оценкой таза':'не определено'}</b></li>${cs?`<li>${esc(cs)}</li>`:''}</ul>`;
+  }else if(r.risk==='low'){
+    tac=`<div class="sec-t">Тактика</div><ul class="rec"><li>Роды с функциональной оценкой таза.</li>${r.missing.length?`<li>Не оценено: ${r.missing.map(m=>m.name.toLowerCase()).join('; ')}.</li>`:''}</ul>`;
+  }
+
+  let logHtml='';
+  if(LOG.length){
+    logHtml=`<div class="sec-t">Функциональная оценка таза в родах</div><table class="t"><tr><th>Время</th><th>Период, открытие</th><th>Головка</th><th>Вастен</th><th>Признаки несоответствия</th></tr>`+
+    LOG.map(a=>{const bad=aBad(a),sg=a.signs.map(i=>SIGNS[i]);
+      return `<tr><td><b>${esc(a.time)}</b></td><td>${a.period}${a.dil!=null?', '+fmt(a.dil)+' см':''}</td><td>${esc(headTxt(a.head))||'—'}</td>
+      <td><span class="res ${a.vasten==='pos'?'bad':a.vasten==='eq'?'warn':a.vasten==='neg'?'ok':'na'}">${VASTEN[a.vasten]}</span></td>
+      <td>${sg.length?`<span class="res bad">${sg.length}:</span> ${esc(sg.join('; '))}`:(bad?'<span class="res bad">Вастен +</span>':'<span class="res ok">нет</span>')}${a.note?`<br><i>${esc(a.note)}</i>`:''}</td></tr>`;}).join('')+`</table>`;
+  }
+  const cm=$('comment').value.trim(),concl=conclusion(r);
+
+  $('sheet').innerHTML=`
+  <div class="sh-head">
+    <div><div class="inst">${esc($('inst').value)} · родовое отделение</div>
+      <h1>Оценка клинически узкого таза в родах</h1>
+      <div class="sub">По алгоритму Приложения Б1 клинических рекомендаций «Клинически узкий таз»</div></div>
+    <div class="dt">Дата: <b>${dateRu($('date').value)||'—'}</b></div>
+  </div>
+  <div class="pt">
+    <div><small>ФИО</small><b>${esc($('fio').value)||'—'}</b></div>
+    <div><small>Возраст</small><b>${esc($('age').value)||'—'}</b></div>
+    <div><small>№ истории родов</small><b>${esc($('card').value)||'—'}</b></div>
+    <div><small>Срок, нед</small><b>${esc($('ga').value)||'—'}</b></div>
+    <div><small>Роды</small><b>${r.parity==='first'?'первые':r.parity==='rep'?'повторные':'—'}</b></div>
+    <div><small>Поступление</small><b>${esc($('adm').value)||'—'}</b></div>
+  </div>
+  ${banner}
+  <div class="cols">
+    <div class="l"><table class="t">${rows}</table>${tac}</div>
+    <div class="r">${flow(route(r))}<div class="fc-cap">Выделен маршрут роженицы (по последней оценке)</div></div>
+  </div>
+  ${logHtml}
+  ${concl?`<div class="concl"><b>Заключение.</b> ${esc(concl)}</div>`:''}
+  ${cm?`<div class="box"><b>Комментарий:</b> ${esc(cm)}</div>`:''}
+  <div class="sign"><div>Врач: <b>${esc($('doctor').value)}</b></div><div>Подпись <span class="ln"></span></div></div>
+  <div class="foot">Лист сформирован по алгоритму КР «Клинически узкий таз» (Прил. Б1), адаптирован для родового отделения. Инструмент поддержки решений; окончательная тактика — за лечащим врачом / консилиумом. * Признаки несоответствия — по сноске к алгоритму.</div>`;
+  fit();
+}
+
+function fit(){const pv=$('pv'),k=Math.min(1,pv.clientWidth/794);$('scaler').style.transform=`scale(${k})`;pv.style.height=($('sheet').offsetHeight*k)+'px';}
+window.addEventListener('resize',fit);
+
+let PDF=null;
+async function makePdf(){
+  if(!window.html2pdf){toast('Модуль PDF не загрузился — открываю печать');window.print();return;}
+  const b=$('btnPdf'),sc=$('scaler'),pv=$('pv');b.disabled=true;b.textContent='Готовлю…';
+  const fam=($('fio').value.trim().split(/\s+/)[0]||'роженица').replace(/[\\/:*?"<>|]/g,'');
+  const name=`КУТ_${fam}_${dateRu($('date').value)}.pdf`;
+  const prevT=sc.style.transform,prevH=pv.style.height;
+  sc.style.transform='none';pv.style.overflow='visible';pv.style.height='auto';window.scrollTo(0,0);
+  try{
+    const blob=await html2pdf().set({margin:0,filename:name,
+      image:{type:'jpeg',quality:0.98},
+      html2canvas:{scale:2,backgroundColor:'#ffffff',scrollX:0,scrollY:0,windowWidth:1000},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','.box','.concl']}
+    }).from($('sheet')).outputPdf('blob');
+    if(PDF&&PDF.url)URL.revokeObjectURL(PDF.url);
+    PDF={blob,name,url:URL.createObjectURL(blob)};
+    const file=new File([blob],name,{type:'application/pdf'});
+    $('pdfShare').hidden=!(navigator.canShare&&navigator.canShare({files:[file]}));
+    $('pdfName').textContent=name;$('pdfModal').classList.add('open');$('pdfShare').hidden?$('pdfDl').focus():$('pdfShare').focus();
+  }catch(e){console.error(e);toast('PDF не собрался — открываю печать');window.print();}
+  finally{sc.style.transform=prevT;pv.style.overflow='';pv.style.height=prevH;fit();b.disabled=false;b.textContent='Скачать PDF';}
+}
+$('pdfShare').onclick=async()=>{
+  if(!PDF)return;
+  try{await navigator.share({files:[new File([PDF.blob],PDF.name,{type:'application/pdf'})],title:PDF.name});$('pdfModal').classList.remove('open');}
+  catch(e){if(e.name!=='AbortError')toast('Не удалось отправить — используйте «Скачать»');}
+};
+$('pdfDl').onclick=()=>{if(!PDF)return;const a=document.createElement('a');a.href=PDF.url;a.download=PDF.name;document.body.appendChild(a);a.click();a.remove();};
+$('pdfClose').onclick=()=>$('pdfModal').classList.remove('open');
+$('pdfModal').onclick=e=>{if(e.target.id==='pdfModal')e.currentTarget.classList.remove('open');};
+$('btnPdf').onclick=makePdf;
+$('btnPrint').onclick=()=>window.print();
+$('btnCopy').onclick=async()=>{
+  const t=conclusion(evaluate());if(!t){toast('Нет данных для заключения');return;}
+  try{await navigator.clipboard.writeText(t);}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();}
+  toast('Заключение скопировано');
+};
+window.addEventListener('beforeunload',e=>{if(LOG.length){e.preventDefault();e.returnValue='';}});
+
+document.addEventListener('input',render);
+document.addEventListener('change',render);
+render();
+if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+</script>
+</body>
+</html>
