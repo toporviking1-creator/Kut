@@ -1,5 +1,5 @@
 // При каждом обновлении index.html меняйте версию — иначе у пользователей останется старая
-const CACHE = 'kut-v1.1';
+const CACHE = 'kut-v1.2';
 const ASSETS = [
   './',
   './index.html',

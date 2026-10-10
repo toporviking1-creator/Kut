@@ -82,7 +82,11 @@ details.fold summary{cursor:pointer;font-weight:700;font-size:15px;color:var(--n
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#000;color:#fff;padding:10px 16px;border-radius:8px;font-weight:700;display:none;z-index:20}
 
 /* ===== ЛИСТ A4 ===== */
-.sheet{width:794px;min-height:1120px;padding:32px 38px 24px;background:#fff;color:#000;font-family:var(--sans);font-size:12.5px;line-height:1.35;display:flex;flex-direction:column;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet{width:794px;height:1122px;overflow:hidden;background:#fff;color:#000;font-family:var(--sans);font-size:12.5px;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet.multi{height:auto;overflow:visible}
+.sheet-in{width:794px;min-height:1122px;padding:34px 40px 34px;display:flex;flex-direction:column;transform-origin:0 0}
+.sheet.multi .sheet-in{min-height:0}
+.concl,.box,.sign{overflow-wrap:anywhere}
 .sh-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #0d2a4a;padding-bottom:8px}
 .sh-head .inst{font-size:12px;font-weight:700;color:#0d2a4a}
 .sh-head h1{font-family:var(--serif);font-size:23px;margin:3px 0 2px;color:#000;line-height:1.15}
@@ -122,15 +126,18 @@ ul.rec li{margin:2px 0}
 .foot{margin-top:auto;padding-top:10px;border-top:1px solid #6b7786;font-size:10px;color:#1a2430}
 
 @media print{
-  @page{size:A4;margin:0}
   html,body{background:#fff}
   body *{visibility:hidden}
   #sheet,#sheet *{visibility:visible}
   #sheet{position:absolute;left:0;top:0}
+  /* скрытая форма не должна давать пустые страницы */
+  :has(#sheet)>*:not(:has(#sheet)):not(#sheet){display:none!important}
+  main,#pv,#scaler{margin:0!important;padding:0!important;max-width:none!important}
   #scaler{transform:none!important}
   #pv{overflow:visible;border:0;height:auto!important}
 }
 </style>
+<style id="pageCss">@page{size:A4;margin:0}</style>
 </head>
 <body>
 <header class="top">
@@ -237,7 +244,7 @@ ul.rec li{margin:2px 0}
   <h2>Лист для печати</h2>
   <div id="pv"><div id="scaler"><div id="sheet" class="sheet"></div></div></div>
 </section>
-<div class="ver">КУТ · родблок · v1.1 · данные не сохраняются и никуда не передаются</div>
+<div class="ver">КУТ · родблок · v1.2 · данные не сохраняются и никуда не передаются</div>
 </main>
 
 <div class="bar">
@@ -516,7 +523,7 @@ function render(){
   }
   const cm=$('comment').value.trim(),concl=conclusion(r);
 
-  $('sheet').innerHTML=`
+  $('sheet').innerHTML=`<div class="sheet-in" id="sheetIn">
   <div class="sh-head">
     <div><div class="inst">${esc($('inst').value)} · родовое отделение</div>
       <h1>Оценка клинически узкого таза в родах</h1>
@@ -540,10 +547,29 @@ function render(){
   ${concl?`<div class="concl"><b>Заключение.</b> ${esc(concl)}</div>`:''}
   ${cm?`<div class="box"><b>Комментарий:</b> ${esc(cm)}</div>`:''}
   <div class="sign"><div>Врач: <b>${esc($('doctor').value)}</b></div><div>Подпись <span class="ln"></span></div></div>
-  <div class="foot">Лист сформирован по алгоритму КР «Клинически узкий таз» (Прил. Б1), адаптирован для родового отделения. Инструмент поддержки решений; окончательная тактика — за лечащим врачом / консилиумом. * Признаки несоответствия — по сноске к алгоритму.</div>`;
-  fit();
+  <div class="foot">Лист сформирован по алгоритму КР «Клинически узкий таз» (Прил. Б1), адаптирован для родового отделения. Инструмент поддержки решений; окончательная тактика — за лечащим врачом / консилиумом. * Признаки несоответствия — по сноске к алгоритму.</div></div>`;
+  fitPage();fit();
 }
 
+/* Подгонка листа под одну страницу A4: если содержимое длиннее — пропорционально уменьшаем.
+   Если уменьшать пришлось бы сильнее MIN_K (мелкий шрифт) — лист идёт на 2+ страницы. */
+const A4H=1122,MIN_K=0.7;
+function setPageCss(multi){$('pageCss').textContent=multi?'@page{size:A4;margin:10mm 0 12mm}':'@page{size:A4;margin:0}';}
+function fitPage(){
+  const sh=$('sheet'),inn=$('sheetIn');if(!inn)return;
+  sh.classList.remove('multi');inn.style.transform='';inn.style.width='';inn.style.minHeight='';
+  setPageCss(false);
+  const h=inn.scrollHeight;
+  if(h<=A4H)return;
+  const k=A4H/h;
+  if(k<MIN_K){sh.classList.add('multi');setPageCss(true);return;}
+  // при расширении текст переносится реже — уточняем масштаб за несколько шагов
+  let kk=k;
+  for(let i=0;i<4;i++){inn.style.width=(794/kk)+'px';const hh=inn.scrollHeight;kk=Math.min(1,A4H/hh);}
+  inn.style.width=(794/kk)+'px';
+  while(inn.scrollHeight*kk>A4H){kk*=0.99;inn.style.width=(794/kk)+'px';}
+  inn.style.minHeight=(A4H/kk)+'px';inn.style.transform=`scale(${kk})`;
+}
 function fit(){const pv=$('pv'),k=Math.min(1,pv.clientWidth/794);$('scaler').style.transform=`scale(${k})`;pv.style.height=($('sheet').offsetHeight*k)+'px';}
 window.addEventListener('resize',fit);
 
@@ -556,10 +582,10 @@ async function makePdf(){
   const prevT=sc.style.transform,prevH=pv.style.height;
   sc.style.transform='none';pv.style.overflow='visible';pv.style.height='auto';window.scrollTo(0,0);
   try{
-    const blob=await html2pdf().set({margin:0,filename:name,
+    const blob=await html2pdf().set({margin:$('sheet').classList.contains('multi')?[10,0,12,0]:0,filename:name,
       image:{type:'jpeg',quality:0.98},
       html2canvas:{scale:2,backgroundColor:'#ffffff',scrollX:0,scrollY:0,windowWidth:1000},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','.box','.concl']}
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','.box','.concl','.sign']}
     }).from($('sheet')).outputPdf('blob');
     if(PDF&&PDF.url)URL.revokeObjectURL(PDF.url);
     PDF={blob,name,url:URL.createObjectURL(blob)};
