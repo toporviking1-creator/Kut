@@ -98,6 +98,7 @@ details.fold summary{cursor:pointer;font-weight:700;font-size:15px;color:var(--n
 .banner.high{background:#b3001e;color:#fff}
 .banner.low{background:#0a6231;color:#fff}
 .banner.none{background:#fff;color:#000;border:1.5px dashed #000}
+.banner.anat{background:#7a3f00;color:#fff;margin-top:6px;font-size:14px}
 .banner.em{background:#fff200;color:#000;border:2px solid #000;margin-top:6px}
 .cols{display:flex;gap:16px;margin-top:10px}
 .cols .l{flex:1;min-width:0}
@@ -173,6 +174,12 @@ ul.rec li{margin:2px 0}
   </div>
   <h3>Наружная пельвиметрия, см</h3>
   <div class="grid" id="pelGrid"></div>
+  <h3>Индекс Соловьева и истинная конъюгата</h3>
+  <div class="grid">
+    <label class="f">Окружность лучезапястного сустава, см<input type="text" id="solov" inputmode="decimal"><span class="hint">&lt; 14 тонкие · 14–16 средние · &gt; 16 массивные кости</span><span class="flag" id="f_solov"></span></label>
+    <div class="f"><span>Истинная конъюгата</span><div id="cveraBox" class="hint" style="padding-top:6px">Введите C. diagonalis или C. externa</div></div>
+  </div>
+
   <h3>Ромб Михаэлиса, см</h3>
   <div class="grid">
     <label class="f">Продольный<input type="text" id="mL" inputmode="decimal"><span class="hint">фактор: &lt; 10,6</span><span class="flag" id="f_mL"></span></label>
@@ -230,7 +237,7 @@ ul.rec li{margin:2px 0}
   <h2>Лист для печати</h2>
   <div id="pv"><div id="scaler"><div id="sheet" class="sheet"></div></div></div>
 </section>
-<div class="ver">КУТ · родблок · v1.0 · данные не сохраняются и никуда не передаются</div>
+<div class="ver">КУТ · родблок · v1.1 · данные не сохраняются и никуда не передаются</div>
 </main>
 
 <div class="bar">
@@ -280,6 +287,28 @@ const SIGNS=[
 ];
 const VASTEN={'':'не оценивался',neg:'отрицательный',eq:'вровень',pos:'положительный'};
 const RATIO_THR=4.7;
+// Индекс Соловьева → поправка для расчёта истинной конъюгаты по C. diagonalis
+const SOLOV=[
+  {max:14,   cls:'тонкие кости',   corr:1.2},
+  {max:16.01,cls:'средние кости',  corr:1.5},
+  {max:1e9,  cls:'массивные кости',corr:2.0},
+];
+// Степени сужения таза по истинной конъюгате (см)
+const DEGREE=[
+  {min:11,  txt:'норма'},
+  {min:9,   txt:'I степень'},
+  {min:7.5, txt:'II степень'},
+  {min:6.5, txt:'III степень'},
+  {min:-1e9,txt:'IV степень'},
+];
+function solovCalc(sv,cdiag,cext){
+  const r={sv,cls:null,corr:null,cvera:null,src:null,deg:null};
+  if(sv!=null){const b=SOLOV.find(x=>sv<x.max);r.cls=b.cls;r.corr=b.corr;}
+  if(cdiag!=null&&r.corr!=null){r.cvera=cdiag-r.corr;r.src='C. diagonalis \u2212 '+fmt(r.corr);}
+  else if(cext!=null){r.cvera=cext-9;r.src='C. externa \u2212 9';}
+  if(r.cvera!=null)r.deg=DEGREE.find(d=>r.cvera>=d.min);
+  return r;
+}
 
 /* ==== утилиты ==== */
 const $=id=>document.getElementById(id);
@@ -330,10 +359,11 @@ function evaluate(){
   ];
   const assessed=crit.filter(c=>c.flag!==null).length,pos=crit.filter(c=>c.flag===true),missing=crit.filter(c=>c.flag===null);
   const ratio=(h!=null&&fh)?h/fh:null;
+  const sol=solovCalc(num('solov'),num('cdiag'),num('cext'));
   const risk=pos.length?'high':assessed===0?'none':'low';
   const last=LOG.length?LOG[LOG.length-1]:null;
   const anyBad=LOG.some(aBad);
-  return{parity,h,shoe,shoeFlag,efw,fh,mL,mT,pel,crit,assessed,pos,missing,ratio,risk,last,anyBad,tactic:$('tactic').value};
+  return{parity,h,shoe,shoeFlag,efw,fh,mL,mT,pel,crit,assessed,pos,missing,ratio,sol,risk,last,anyBad,tactic:$('tactic').value};
 }
 
 /* ==== блок-схема (родблок) ==== */
@@ -399,6 +429,9 @@ function conclusion(r){
   }else if(r.risk==='low'){
     t=`Учитывая ${ga?'срок беременности '+ga+' нед., ':''}отсутствие факторов риска клинически узкого таза${r.missing.length?' по оценённым критериям ('+r.assessed+' из 6)':''}, согласно КР «Клинически узкий таз» (Приложение Б1) роженица относится к группе низкого риска КУТ. Роды ведутся с функциональной оценкой таза.`;
   }
+  if(r.sol.cvera!=null&&r.sol.deg.min<11){
+    t+=(t?' ':'')+`Истинная конъюгата ${fmt(r.sol.cvera,1)} см (${r.sol.src}${r.sol.cls?', индекс Соловьева '+fmt(r.sol.sv)+' см \u2014 '+r.sol.cls:''}) \u2014 анатомически узкий таз, ${r.sol.deg.txt} сужения.`;
+  }
   if(r.last){const a=r.last,bad=aBad(a);
     const sg=[...(a.vasten==='pos'?['положительный признак Вастена']:[]),...a.signs.map(i=>SIGNS[i].toLowerCase())];
     t+=(t?' ':'')+`При функциональной оценке таза в ${a.time} (${aSummary(a)}) `+
@@ -420,6 +453,12 @@ function render(){
   setFlag('f_height',r.crit[1].flag);setFlag('f_shoe',r.shoeFlag);setFlag('f_efw',r.crit[5].flag);
   r.pel.forEach(p=>setFlag('f_'+p.id,p.flag));
   setFlag('f_mL',r.mL==null?null:r.mL<10.6);setFlag('f_mT',r.mT==null?null:r.mT<9.6);
+  const sf=$('f_solov'),sb=$('cveraBox'),S=r.sol;
+  if(S.cls){sf.className='flag'+(S.sv>16?' bad':'');sf.textContent=S.cls+(S.sv>16?' \u2014 ёмкость таза меньше':'');}
+  else{sf.className='flag';sf.textContent='';}
+  if(S.cvera!=null){const n=S.deg.min>=11;
+    sb.innerHTML=`<b style="font-size:16px;color:${n?'var(--green)':'var(--red)'}">C. vera ${fmt(S.cvera,1)} см</b><br>${S.src}${n?'':' \u00b7 '+S.deg.txt+' сужения'}`;}
+  else sb.textContent=S.sv!=null?'Нужна C. diagonalis или C. externa':'Введите C. diagonalis или C. externa';
   const rf=$('f_ratio');
   if(r.ratio!=null){const b=r.ratio<RATIO_THR;rf.className='flag '+(b?'bad':'ok');rf.textContent=`рост/ВДМ = ${fmt(r.ratio,2)}`;}else{rf.className='flag';rf.textContent='';}
   $('tacCard').classList.toggle('muted-card',r.risk!=='high');
@@ -443,6 +482,7 @@ function render(){
   if(r.risk==='high')banner=`<div class="banner high">Группа высокого риска КУТ<span>факторов: ${r.pos.length} из ${r.assessed} оценённых</span></div>`;
   else if(r.risk==='low')banner=`<div class="banner low">Группа низкого риска КУТ<span>${r.missing.length?'оценено '+r.assessed+' из 6 критериев':'оценены все 6 критериев'}</span></div>`;
   else banner=`<div class="banner none">Факторы риска не оценены</div>`;
+  if(r.sol.cvera!=null&&r.sol.deg.min<11)banner+=`<div class="banner anat">Анатомически узкий таз: ${r.sol.deg.txt} сужения (C. vera ${fmt(r.sol.cvera,1)} см)</div>`;
   if(r.last&&aBad(r.last))banner+=`<div class="banner em">Признаки несоответствия (${esc(r.last.time)}) — показано экстренное кесарево сечение</div>`;
 
   const c=r.crit;
@@ -453,7 +493,10 @@ function render(){
   rows+=`<tr class="grp"><td colspan="3">Ромб Михаэлиса</td><td>${resCell(c[4].flag)}</td></tr>`;
   rows+=`<tr><td class="sub">Продольный</td><td>${r.mL==null?'—':fmt(r.mL)+' см'}</td><td>&lt; 10,6 см</td><td>${r.mL==null?'':resCell(r.mL<10.6)}</td></tr>`;
   rows+=`<tr><td class="sub">Поперечный</td><td>${r.mT==null?'—':fmt(r.mT)+' см'}</td><td>&lt; 9,6 см</td><td>${r.mT==null?'':resCell(r.mT<9.6)}</td></tr>`;
-  rows+=`<tr class="grp"><td colspan="4">Доп. маркер (текст КР, в алгоритм Б1 не входит)</td></tr>`;
+  rows+=`<tr class="grp"><td colspan="4">Доп. маркеры (в алгоритм Б1 не входят)</td></tr>`;
+  const S2=r.sol;
+  rows+=`<tr><td class="sub">Индекс Соловьева</td><td>${S2.sv==null?'—':fmt(S2.sv)+' см'}</td><td>14–16 см</td><td>${S2.cls?`<span class="res ${S2.sv>16?'warn':'ok'}">${S2.cls}</span>`:''}</td></tr>`;
+  rows+=`<tr><td class="sub">Истинная конъюгата</td><td>${S2.cvera==null?'—':fmt(S2.cvera,1)+' см'}</td><td>${S2.src?esc(S2.src):'≥ 11 см'}</td><td>${S2.cvera==null?'':(S2.deg.min>=11?'<span class="res ok">норма</span>':`<span class="res bad">${S2.deg.txt}</span>`)}</td></tr>`;
   rows+=`<tr><td class="sub">Рост / ВДМ</td><td>${r.ratio==null?'—':fmt(r.ratio,2)}</td><td>&lt; 4,7</td><td>${r.ratio==null?'':(r.ratio<RATIO_THR?'<span class="res bad">снижено</span>':'<span class="res ok">норма</span>')}</td></tr>`;
 
   let tac='';
