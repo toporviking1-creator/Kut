@@ -1,5 +1,5 @@
 // При каждом обновлении index.html меняйте версию — иначе у пользователей останется старая
-const CACHE = 'kut-v1.2';
+const CACHE = 'kut-v1.3';
 const ASSETS = [
   './',
   './index.html',
@@ -8,11 +8,12 @@ const ASSETS = [
   './icons/icon-512.png',
   './icons/maskable-512.png',
   './icons/apple-touch-icon.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(ASSETS.map(a => c.add(a)))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {

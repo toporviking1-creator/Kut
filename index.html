@@ -13,7 +13,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="КУТ">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --ink:#000814; --ink2:#1a2430; --navy:#0d2a4a; --line:#6b7786;
@@ -244,7 +245,7 @@ ul.rec li{margin:2px 0}
   <h2>Лист для печати</h2>
   <div id="pv"><div id="scaler"><div id="sheet" class="sheet"></div></div></div>
 </section>
-<div class="ver">КУТ · родблок · v1.2 · данные не сохраняются и никуда не передаются</div>
+<div class="ver">КУТ · родблок · v1.3 · данные не сохраняются и никуда не передаются</div>
 </main>
 
 <div class="bar">
@@ -574,19 +575,53 @@ function fit(){const pv=$('pv'),k=Math.min(1,pv.clientWidth/794);$('scaler').sty
 window.addEventListener('resize',fit);
 
 let PDF=null;
+/* Снимок листа: копия кладётся в отдельный контейнер шириной ровно 794px (A4),
+   вне вёрстки телефона — поэтому ширина экрана больше не обрезает правый край. */
+async function sheetToPdf(){
+  const W=794,PH=1122,src=$('sheet'),multi=src.classList.contains('multi');
+  const host=document.createElement('div');
+  host.style.cssText='position:absolute;left:0;top:0;width:'+W+'px;overflow:visible;background:#fff;z-index:-1;pointer-events:none';
+  const cl=src.cloneNode(true);cl.removeAttribute('id');cl.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));
+  host.appendChild(cl);document.body.appendChild(host);
+  try{
+    if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+    const H=Math.ceil(cl.getBoundingClientRect().height);
+    // точки, где можно резать лист на страницы (низ строк/блоков)
+    const top0=cl.getBoundingClientRect().top;
+    const cuts=[...cl.querySelectorAll('tr,.box,.concl,.sign,.sec-t,.banner,.cols,.pt,.sh-head')].map(e=>e.getBoundingClientRect().bottom-top0).sort((x,y)=>x-y);
+    const SC=2;
+    const canvas=await html2canvas(cl,{scale:SC,backgroundColor:'#ffffff',width:W,height:H,windowWidth:W,windowHeight:Math.max(H,PH),x:0,y:0,scrollX:0,scrollY:0,useCORS:true,logging:false});
+    const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait',compress:true});
+    const mmPerPx=210/W;
+    if(!multi){
+      pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,210,Math.min(297,H*mmPerPx));
+    }else{
+      const mt=10,mb=12,avail=(297-mt-mb)/mmPerPx; // px исходного листа на страницу
+      let y=0,first=true;
+      while(y<H-1){
+        let end=Math.min(H,y+avail);
+        if(end<H){const c=cuts.filter(v=>v>y+40&&v<=end).pop();if(c)end=c;}
+        const hpx=Math.ceil(end-y),pc=document.createElement('canvas');
+        pc.width=canvas.width;pc.height=Math.ceil(hpx*SC);
+        const g=pc.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,pc.width,pc.height);
+        g.drawImage(canvas,0,Math.floor(y*SC),canvas.width,pc.height,0,0,pc.width,pc.height);
+        if(!first)pdf.addPage();first=false;
+        pdf.addImage(pc.toDataURL('image/jpeg',0.95),'JPEG',0,mt,210,hpx*mmPerPx);
+        y=end;
+      }
+    }
+    return pdf.output('blob');
+  }finally{host.remove();}
+}
 async function makePdf(){
-  if(!window.html2pdf){toast('Модуль PDF не загрузился — открываю печать');window.print();return;}
+  if(!window.html2canvas||!window.jspdf){toast('Модуль PDF не загрузился — открываю печать');window.print();return;}
   const b=$('btnPdf'),sc=$('scaler'),pv=$('pv');b.disabled=true;b.textContent='Готовлю…';
   const fam=($('fio').value.trim().split(/\s+/)[0]||'роженица').replace(/[\\/:*?"<>|]/g,'');
   const name=`КУТ_${fam}_${dateRu($('date').value)}.pdf`;
   const prevT=sc.style.transform,prevH=pv.style.height;
   sc.style.transform='none';pv.style.overflow='visible';pv.style.height='auto';window.scrollTo(0,0);
   try{
-    const blob=await html2pdf().set({margin:$('sheet').classList.contains('multi')?[10,0,12,0]:0,filename:name,
-      image:{type:'jpeg',quality:0.98},
-      html2canvas:{scale:2,backgroundColor:'#ffffff',scrollX:0,scrollY:0,windowWidth:1000},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','.box','.concl','.sign']}
-    }).from($('sheet')).outputPdf('blob');
+    const blob=await sheetToPdf();
     if(PDF&&PDF.url)URL.revokeObjectURL(PDF.url);
     PDF={blob,name,url:URL.createObjectURL(blob)};
     const file=new File([blob],name,{type:'application/pdf'});
